@@ -3,6 +3,7 @@ title: T212 Insights Assistant
 description: Integration with Trading212 brokerage API for account management and trading
 author: @fakiho
 author_url: https://github.com/fakiho
+source: https://github.com/fakiho/T212Insights/tree/v1.0.0
 version: 1.0.0
 license: MIT
 requirements:
