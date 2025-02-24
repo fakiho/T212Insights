@@ -1,0 +1,11 @@
+/.DS_Store
+/Trading212V2.py
+/__pycache__
+/api_cache
+main.py
+/trading212.log
+T212Insights/api_cache
+Reference type shared modifier.playgroundbook/
+trading212.log
+__pycache__/
+.venv/
