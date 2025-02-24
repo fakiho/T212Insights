@@ -7,12 +7,13 @@ source: https://github.com/fakiho/T212Insights/tree/v1.0.0
 version: 1.0.0
 license: MIT
 requirements:
-    - diskcache
+    - diskcache>=5.2.1
     - httpx>=0.27.0
     - pydantic>=2.5.2
     - cachetools>=4.2.4
 """
 
+import os
 import logging
 from pydantic import BaseModel, Field
 import httpx
@@ -233,10 +234,12 @@ def extract_cash_info(item):
         "-"
     )
 
+
 def format_cash_info(json_data):
     """Formats the cash balance information."""
     data = json.loads(json_data) if isinstance(json_data, str) else json_data
     return extract_cash_info(data)
+
 
 # PIE Extraction
 def extract_dividend_details(dividend_details):
@@ -248,6 +251,7 @@ def extract_dividend_details(dividend_details):
         f"  - In Cash: {dividend_details['inCash']}\n"
     )
 
+
 def extract_pie_details(result):
     """Formats result details."""
     return (
@@ -258,29 +262,51 @@ def extract_pie_details(result):
         f"  - Price Avg Result Coef: {result['priceAvgResultCoef']:.4f}\n"
     )
 
+
 def extract_pie(item):
     """Extracts and formats a single JSON object."""
     return (
-        f"ID: {item['id']}\n"
-        f"Cash: {item['cash']}\n"
-        f"Progress: {item['progress']:.4f}\n"
-        f"Status: {item['status']}\n"
-        f"{extract_dividend_details(item['dividendDetails'])}"
-        f"{extract_pie_details(item['result'])}"
+        "Pie details:\n"
+        "{\n"
+        f" ID: {item['id']}\n"
+        f" Cash: {item['cash']}\n"
+        f" Progress: {item['progress']:.4f}\n"
+        f" Status: {item['status']}\n"
+        f" {extract_dividend_details(item['dividendDetails'])}"
+        f" {extract_pie_details(item['result'])}"
+        "}"
     )
+
 
 def extract_pie_array_content(json_data):
     """Extracts and formats the content of a JSON array."""
     data = json.loads(json_data) if isinstance(json_data, str) else json_data
-    return "\n".join(extract_pie(item) for item in data)
+    header = f"\ntotal pies: {len(data)} \n List of pies details:"
+    body = header + "List:".join(extract_pie(item) for item in data)
+    return body
 
 
 class Tools:
+    """
+    Tools class for interacting with the Trading212 API.
+
+    Attributes:
+        valves (Valves): Configuration parameters.
+        base_url (str): Base URL for API requests.
+        headers (dict): Headers for API authentication.
+        citation (bool): Flag for citation usage.
+    """
+
     class Valves(BaseModel):
         api_key: str = Field(
-            "", description="Trading212 API key (36-character alphanumeric)"
+            default_factory=lambda: os.getenv("TRADING212_API_KEY", ""),
+            description="Trading212 API key (36-character alphanumeric)",
         )
-        demo_mode: bool = Field(True, description="Use demo trading environment")
+
+        demo_mode: bool = Field(
+            default_factory=lambda: os.getenv("TRADING212_DEMO_MODE", "True") == "True",
+            description="Use demo trading environment",
+        )
 
     def __init__(self):
         try:
@@ -303,7 +329,7 @@ class Tools:
         endpoint: str,
         params: Union[Dict[str, Union[int, str]]] = None,
         data: Union[Dict[str, Any]] = None,
-        force_refresh: bool = False
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Generic request handler with full type annotations"""
         # Normalize `params` to avoid cache misses due to empty vs. None
@@ -360,9 +386,7 @@ class Tools:
                 }
             )
 
-        result = await self._make_request(
-            "GET", "/api/v0/equity/account/cash"
-        )
+        result = await self._make_request("GET", "/api/v0/equity/account/cash")
         currency = await self.get_account_meta()
         total = result["total"]
         ppl = result["ppl"]
@@ -453,7 +477,7 @@ class Tools:
         __event_emitter__: Union[Callable[[Any], Awaitable[None]]] = None,
     ) -> str:
         """
-        Search/find an open position in profolio by a ticker with proper nested typing 
+        Search/find an open position in profolio by a ticker with proper nested typing
         :param ticker: The ticker symbol of the instrument to get positions for like `AAPL_US_EQ`.
         :return: A comprehensive analysis report of the portfolio as a formatted string.
         """
@@ -611,14 +635,13 @@ class Tools:
             if matching_instruments
             else f"No instruments found for '{search_term}'."
         )
-    
 
     async def getAllPies(
         self,
         __event_emitter__: Union[Callable[[Any], Awaitable[None]]] = None,
     ) -> str:
         """
-        Fetches all the pies in the account.
+        this function fetch all the pies in the account.
         A pie is a collection of securities - stocks & ETFs.
         Each security is represented as a slice of the pie. Each pie can hold up to 50 securities. You can have multiple pies.
         :return: The formatted string of the existing pie(s) and the dividend(s).
@@ -646,8 +669,4 @@ class Tools:
                     },
                 }
             )
-        return (
-            extract_pie_array_content(result)
-            if result
-            else f"No pies found."
-        )
+        return extract_pie_array_content(result)
